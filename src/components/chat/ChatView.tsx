@@ -13,6 +13,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import MediaUpload from "./MediaUpload";
 
 interface ChatViewProps {
   userId: string;
@@ -24,6 +26,8 @@ interface Message {
   content: string;
   sender_id: string;
   created_at: string;
+  type?: string;
+  media_url?: string | null;
   sender?: {
     username: string;
     avatar_url: string | null;
@@ -34,15 +38,19 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<any>(null);
+  const [currentUsername, setCurrentUsername] = useState("");
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const { typingUsers, setTyping } = useTypingIndicator(conversationId, userId);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (!conversationId) return;
 
     loadMessages();
     loadOtherUser();
+    loadCurrentUser();
 
     // Subscribe to new messages
     const channel = supabase
@@ -109,6 +117,18 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     setMessages((prev) => [...prev, { ...message, sender: profile }]);
   };
 
+  const loadCurrentUser = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .single();
+
+    if (data) {
+      setCurrentUsername(data.username);
+    }
+  };
+
   const loadOtherUser = async () => {
     if (!conversationId) return;
 
@@ -129,22 +149,36 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
+  const handleTyping = () => {
+    setTyping(true, currentUsername);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      setTyping(false, currentUsername);
+    }, 2000);
+  };
+
+  const sendMessage = async (e: React.FormEvent, mediaUrl?: string, mediaType?: "image" | "file") => {
     e.preventDefault();
-    if (!newMessage.trim() || !conversationId) return;
+    if ((!newMessage.trim() && !mediaUrl) || !conversationId) return;
 
     try {
       const { error } = await supabase.from("messages").insert({
         conversation_id: conversationId,
         sender_id: userId,
-        content: newMessage.trim(),
-        type: "text",
+        content: mediaUrl ? (mediaType === "image" ? "📷 Image" : "📎 File") : newMessage.trim(),
+        type: mediaUrl ? (mediaType === "image" ? "image" : "file") : "text",
+        media_url: mediaUrl,
       });
 
       if (error) throw error;
 
       setNewMessage("");
       setShowEmojiPicker(false);
+      setTyping(false, currentUsername);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -152,6 +186,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleMediaUploaded = (url: string, type: "image" | "file") => {
+    sendMessage(new Event("submit") as any, url, type);
   };
 
   const scrollToBottom = () => {
@@ -195,7 +233,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           <div>
             <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
             <p className="text-sm text-muted-foreground">
-              {otherUser?.is_online ? "Online" : "Offline"}
+              {Object.keys(typingUsers).length > 0
+                ? "typing..."
+                : otherUser?.is_online
+                ? "Online"
+                : "Offline"}
             </p>
           </div>
         </div>
@@ -226,7 +268,25 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                       : "bg-chat-bubble-received text-chat-bubble-received-foreground"
                   }`}
                 >
-                  <p className="break-words">{message.content}</p>
+                  {message.type === "image" && message.media_url ? (
+                    <img
+                      src={message.media_url}
+                      alt="Shared media"
+                      className="rounded-lg max-w-full mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(message.media_url, "_blank")}
+                    />
+                  ) : message.type === "file" && message.media_url ? (
+                    <a
+                      href={message.media_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm underline hover:opacity-80"
+                    >
+                      📎 {message.content}
+                    </a>
+                  ) : (
+                    <p className="break-words">{message.content}</p>
+                  )}
                   <p className="text-xs opacity-70 mt-1">
                     {new Date(message.created_at).toLocaleTimeString([], {
                       hour: "2-digit",
@@ -242,8 +302,9 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       </ScrollArea>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-border bg-chat-header">
-        <form onSubmit={sendMessage} className="flex items-center gap-2">
+      <div className="p-4 border-t border-border bg-chat-header space-y-2">
+        <MediaUpload onMediaUploaded={handleMediaUploaded} userId={userId} />
+        <form onSubmit={(e) => sendMessage(e)} className="flex items-center gap-2">
           <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
             <PopoverTrigger asChild>
               <Button
@@ -262,7 +323,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           <Input
             placeholder="Type a message..."
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(e) => {
+              setNewMessage(e.target.value);
+              handleTyping();
+            }}
             className="flex-1"
           />
           <Button

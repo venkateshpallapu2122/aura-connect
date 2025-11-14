@@ -47,15 +47,18 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        chat: {
+          "bubble-sent": "hsl(var(--chat-bubble-sent))",
+          "bubble-sent-foreground": "hsl(var(--chat-bubble-sent-foreground))",
+          "bubble-received": "hsl(var(--chat-bubble-received))",
+          "bubble-received-foreground": "hsl(var(--chat-bubble-received-foreground))",
+          header: "hsl(var(--chat-header))",
+          sidebar: "hsl(var(--chat-sidebar))",
+        },
+        status: {
+          online: "hsl(var(--status-online))",
+          away: "hsl(var(--status-away))",
+          offline: "hsl(var(--status-offline))",
         },
       },
       borderRadius: {

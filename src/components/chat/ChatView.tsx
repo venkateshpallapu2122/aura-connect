@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Smile, MessageCircle } from "lucide-react";
+import { Send, Smile, MessageCircle, Search, Check, CheckCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
@@ -14,7 +14,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useReadReceipts } from "@/hooks/useReadReceipts";
 import MediaUpload from "./MediaUpload";
+import VoiceRecorder from "./VoiceRecorder";
+import MessageSearch from "./MessageSearch";
+import GroupChatHeader from "./GroupChatHeader";
 
 interface ChatViewProps {
   userId: string;
@@ -39,10 +43,16 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<any>(null);
   const [currentUsername, setCurrentUsername] = useState("");
+  const [conversationType, setConversationType] = useState<string>("direct");
+  const [conversationName, setConversationName] = useState<string>("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { typingUsers, setTyping } = useTypingIndicator(conversationId, userId);
+  const { readReceipts, markAsRead } = useReadReceipts(conversationId, userId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -51,6 +61,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     loadMessages();
     loadOtherUser();
     loadCurrentUser();
+    loadConversation();
 
     // Subscribe to new messages
     const channel = supabase
@@ -76,7 +87,24 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
   useEffect(() => {
     scrollToBottom();
+    // Mark messages as read when viewing them
+    messages.forEach((msg) => {
+      if (msg.sender_id !== userId) {
+        markAsRead(msg.id);
+      }
+    });
   }, [messages]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = messages.filter((msg) =>
+        msg.content.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredMessages(filtered);
+    } else {
+      setFilteredMessages(messages);
+    }
+  }, [searchQuery, messages]);
 
   const loadMessages = async () => {
     if (!conversationId) return;
@@ -129,6 +157,21 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }
   };
 
+  const loadConversation = async () => {
+    if (!conversationId) return;
+
+    const { data } = await supabase
+      .from("conversations")
+      .select("type, name")
+      .eq("id", conversationId)
+      .single();
+
+    if (data) {
+      setConversationType(data.type);
+      setConversationName(data.name || "");
+    }
+  };
+
   const loadOtherUser = async () => {
     if (!conversationId) return;
 
@@ -161,7 +204,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }, 2000);
   };
 
-  const sendMessage = async (e: React.FormEvent, mediaUrl?: string, mediaType?: "image" | "file") => {
+  const sendMessage = async (e: React.FormEvent, mediaUrl?: string, mediaType?: "image" | "file" | "voice") => {
     e.preventDefault();
     if ((!newMessage.trim() && !mediaUrl) || !conversationId) return;
 
@@ -169,8 +212,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       const { error } = await supabase.from("messages").insert({
         conversation_id: conversationId,
         sender_id: userId,
-        content: mediaUrl ? (mediaType === "image" ? "📷 Image" : "📎 File") : newMessage.trim(),
-        type: mediaUrl ? (mediaType === "image" ? "image" : "file") : "text",
+        content: mediaUrl 
+          ? (mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File")
+          : newMessage.trim(),
+        type: mediaUrl ? mediaType : "text",
         media_url: mediaUrl,
       });
 
@@ -190,6 +235,23 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
   const handleMediaUploaded = (url: string, type: "image" | "file") => {
     sendMessage(new Event("submit") as any, url, type);
+  };
+
+  const handleVoiceSent = (url: string) => {
+    sendMessage(new Event("submit") as any, url, "voice");
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const highlightText = (text: string, highlight: string) => {
+    if (!highlight.trim()) return text;
+    const regex = new RegExp(`(${highlight})`, "gi");
+    const parts = text.split(regex);
+    return parts.map((part, i) => 
+      regex.test(part) ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600">{part}</mark> : part
+    );
   };
 
   const scrollToBottom = () => {
@@ -218,36 +280,61 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     <div className="flex-1 flex flex-col h-full">
       {/* Chat Header */}
       <div className="p-4 border-b border-border bg-chat-header">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar>
-              <AvatarImage src={otherUser?.avatar_url || undefined} />
-              <AvatarFallback className="gradient-primary text-white">
-                {otherUser?.username?.charAt(0).toUpperCase() || "?"}
-              </AvatarFallback>
-            </Avatar>
-            {otherUser?.is_online && (
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-online rounded-full border-2 border-chat-header" />
-            )}
-          </div>
-          <div>
-            <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
-            <p className="text-sm text-muted-foreground">
-              {Object.keys(typingUsers).length > 0
-                ? "typing..."
-                : otherUser?.is_online
-                ? "Online"
-                : "Offline"}
-            </p>
-          </div>
+        <div className="flex items-center gap-3 flex-1">
+          {conversationType === "group" ? (
+            <GroupChatHeader
+              conversationId={conversationId!}
+              conversationName={conversationName}
+              conversationType={conversationType}
+              userId={userId}
+            />
+          ) : (
+            <>
+              <div className="relative">
+                <Avatar>
+                  <AvatarImage src={otherUser?.avatar_url || undefined} />
+                  <AvatarFallback className="gradient-primary text-white">
+                    {otherUser?.username?.charAt(0).toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                {otherUser?.is_online && (
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-online rounded-full border-2 border-chat-header" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {Object.keys(typingUsers).length > 0
+                    ? "typing..."
+                    : otherUser?.is_online
+                    ? "Online"
+                    : "Offline"}
+                </p>
+              </div>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSearch(!showSearch)}
+          >
+            <Search className="w-5 h-5" />
+          </Button>
         </div>
       </div>
+
+      {showSearch && (
+        <MessageSearch onSearch={handleSearch} onClose={() => { setShowSearch(false); setSearchQuery(""); }} />
+      )}
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {messages.map((message) => {
+          {filteredMessages.map((message) => {
             const isOwn = message.sender_id === userId;
+            const messageReads = readReceipts[message.id] || [];
+            const isRead = messageReads.some(r => r.user_id !== userId);
+            
             return (
               <div
                 key={message.id}
@@ -275,6 +362,8 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                       className="rounded-lg max-w-full mb-2 cursor-pointer hover:opacity-90 transition-opacity"
                       onClick={() => window.open(message.media_url, "_blank")}
                     />
+                  ) : message.type === "voice" && message.media_url ? (
+                    <audio src={message.media_url} controls className="max-w-full" />
                   ) : message.type === "file" && message.media_url ? (
                     <a
                       href={message.media_url}
@@ -285,14 +374,23 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                       📎 {message.content}
                     </a>
                   ) : (
-                    <p className="break-words">{message.content}</p>
+                    <p className="break-words">{highlightText(message.content, searchQuery)}</p>
                   )}
-                  <p className="text-xs opacity-70 mt-1">
-                    {new Date(message.created_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+                  <div className="flex items-center gap-2 text-xs opacity-70 mt-1">
+                    <span>
+                      {new Date(message.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    {isOwn && (
+                      isRead ? (
+                        <CheckCheck className="w-3 h-3 text-blue-500" />
+                      ) : (
+                        <Check className="w-3 h-3" />
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -305,6 +403,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       <div className="p-4 border-t border-border bg-chat-header space-y-2">
         <MediaUpload onMediaUploaded={handleMediaUploaded} userId={userId} />
         <form onSubmit={(e) => sendMessage(e)} className="flex items-center gap-2">
+          <VoiceRecorder onVoiceSent={handleVoiceSent} userId={userId} />
           <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
             <PopoverTrigger asChild>
               <Button

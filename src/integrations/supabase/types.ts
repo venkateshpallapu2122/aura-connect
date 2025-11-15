@@ -102,6 +102,38 @@ export type Database = {
           },
         ]
       }
+      message_edit_history: {
+        Row: {
+          edited_at: string
+          edited_by: string
+          id: string
+          message_id: string
+          previous_content: string
+        }
+        Insert: {
+          edited_at?: string
+          edited_by: string
+          id?: string
+          message_id: string
+          previous_content: string
+        }
+        Update: {
+          edited_at?: string
+          edited_by?: string
+          id?: string
+          message_id?: string
+          previous_content?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_edit_history_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -227,6 +259,8 @@ export type Database = {
           id: string
           is_online: boolean | null
           last_seen: string | null
+          notification_enabled: boolean | null
+          notification_token: string | null
           status: string | null
           updated_at: string | null
           username: string
@@ -237,6 +271,8 @@ export type Database = {
           id: string
           is_online?: boolean | null
           last_seen?: string | null
+          notification_enabled?: boolean | null
+          notification_token?: string | null
           status?: string | null
           updated_at?: string | null
           username: string
@@ -247,11 +283,83 @@ export type Database = {
           id?: string
           is_online?: boolean | null
           last_seen?: string | null
+          notification_enabled?: boolean | null
+          notification_token?: string | null
           status?: string | null
           updated_at?: string | null
           username?: string
         }
         Relationships: []
+      }
+      voice_participants: {
+        Row: {
+          id: string
+          is_muted: boolean | null
+          joined_at: string
+          left_at: string | null
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_muted?: boolean | null
+          joined_at?: string
+          left_at?: string | null
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_muted?: boolean | null
+          joined_at?: string
+          left_at?: string | null
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "voice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_sessions: {
+        Row: {
+          conversation_id: string
+          created_by: string
+          ended_at: string | null
+          id: string
+          is_active: boolean | null
+          started_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_by: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          started_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_by?: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_sessions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

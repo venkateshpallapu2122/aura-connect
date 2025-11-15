@@ -15,10 +15,15 @@ import {
 } from "@/components/ui/popover";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
+import { useNotifications } from "@/hooks/useNotifications";
 import MediaUpload from "./MediaUpload";
 import VoiceRecorder from "./VoiceRecorder";
 import MessageSearch from "./MessageSearch";
 import GroupChatHeader from "./GroupChatHeader";
+import MessageReactions from "./MessageReactions";
+import MessageActions from "./MessageActions";
+import ChatExport from "./ChatExport";
+import GroupVoiceChat from "./GroupVoiceChat";
 
 interface ChatViewProps {
   userId: string;
@@ -32,6 +37,8 @@ interface Message {
   created_at: string;
   type?: string;
   media_url?: string | null;
+  deleted_at?: string | null;
+  is_edited?: boolean;
   sender?: {
     username: string;
     avatar_url: string | null;
@@ -48,11 +55,14 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { typingUsers, setTyping } = useTypingIndicator(conversationId, userId);
   const { readReceipts, markAsRead } = useReadReceipts(conversationId, userId);
+  useNotifications(userId, conversationId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -254,6 +264,74 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     );
   };
 
+  const handleEditMessage = async (messageId: string) => {
+    if (!editingContent.trim()) return;
+
+    try {
+      // Get current message
+      const { data: currentMessage } = await supabase
+        .from("messages")
+        .select("content")
+        .eq("id", messageId)
+        .single();
+
+      if (currentMessage) {
+        // Save edit history
+        await supabase.from("message_edit_history").insert({
+          message_id: messageId,
+          previous_content: currentMessage.content,
+          edited_by: userId,
+        });
+
+        // Update message
+        await supabase
+          .from("messages")
+          .update({
+            content: editingContent,
+            is_edited: true,
+          })
+          .eq("id", messageId);
+
+        setEditingMessageId(null);
+        setEditingContent("");
+        loadMessages();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      await supabase
+        .from("messages")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", messageId);
+
+      loadMessages();
+      
+      toast({
+        title: "Success",
+        description: "Message deleted",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const startEditingMessage = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditingContent(content);
+  };
+
   const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -320,6 +398,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           >
             <Search className="w-5 h-5" />
           </Button>
+          {conversationId && <ChatExport conversationId={conversationId} />}
+          {conversationType === "group" && (
+            <GroupVoiceChat conversationId={conversationId!} userId={userId} />
+          )}
         </div>
       </div>
 
@@ -334,11 +416,20 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
             const isOwn = message.sender_id === userId;
             const messageReads = readReceipts[message.id] || [];
             const isRead = messageReads.some(r => r.user_id !== userId);
+            const isDeleted = message.deleted_at;
+
+            if (isDeleted) {
+              return (
+                <div key={message.id} className="flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground italic">Message deleted</p>
+                </div>
+              );
+            }
             
             return (
               <div
                 key={message.id}
-                className={`flex items-start gap-2 animate-in ${
+                className={`flex items-start gap-2 animate-in group ${
                   isOwn ? "flex-row-reverse" : ""
                 }`}
               >
@@ -348,13 +439,14 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                     {message.sender?.username?.charAt(0).toUpperCase() || "?"}
                   </AvatarFallback>
                 </Avatar>
-                <div
-                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                    isOwn
-                      ? "bg-chat-bubble-sent text-chat-bubble-sent-foreground"
-                      : "bg-chat-bubble-received text-chat-bubble-received-foreground"
-                  }`}
-                >
+                <div className="flex flex-col max-w-[70%]">
+                  <div
+                    className={`rounded-2xl px-4 py-2 ${
+                      isOwn
+                        ? "bg-chat-bubble-sent text-chat-bubble-sent-foreground"
+                        : "bg-chat-bubble-received text-chat-bubble-received-foreground"
+                    }`}
+                  >
                   {message.type === "image" && message.media_url ? (
                     <img
                       src={message.media_url}
@@ -373,24 +465,67 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                     >
                       📎 {message.content}
                     </a>
+                  ) : editingMessageId === message.id ? (
+                    <div className="flex gap-2">
+                      <Input
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleEditMessage(message.id)}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingMessageId(null);
+                          setEditingContent("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   ) : (
-                    <p className="break-words">{highlightText(message.content, searchQuery)}</p>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <p className="break-words flex-1">
+                          {highlightText(message.content, searchQuery)}
+                        </p>
+                        <MessageActions
+                          messageId={message.id}
+                          messageContent={message.content}
+                          isOwn={isOwn}
+                          onEdit={startEditingMessage.bind(null, message.id)}
+                          onDelete={() => handleDeleteMessage(message.id)}
+                        />
+                      </div>
+                      {message.is_edited && (
+                        <p className="text-xs opacity-50 mt-1">Edited</p>
+                      )}
+                    </>
                   )}
-                  <div className="flex items-center gap-2 text-xs opacity-70 mt-1">
-                    <span>
-                      {new Date(message.created_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {isOwn && (
-                      isRead ? (
-                        <CheckCheck className="w-3 h-3 text-blue-500" />
-                      ) : (
-                        <Check className="w-3 h-3" />
-                      )
-                    )}
+                    <div className="flex items-center gap-2 text-xs opacity-70 mt-1">
+                      <span>
+                        {new Date(message.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {isOwn && (
+                        isRead ? (
+                          <CheckCheck className="w-3 h-3 text-blue-500" />
+                        ) : (
+                          <Check className="w-3 h-3" />
+                        )
+                      )}
+                    </div>
                   </div>
+                  <MessageReactions messageId={message.id} userId={userId} />
                 </div>
               </div>
             );

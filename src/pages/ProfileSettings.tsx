@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Upload, Loader2 } from "lucide-react";
@@ -19,6 +20,7 @@ const ProfileSettings = () => {
     username: "",
     status: "",
     avatar_url: "",
+    notification_enabled: true,
   });
 
   useEffect(() => {
@@ -42,6 +44,7 @@ const ProfileSettings = () => {
           username: data.username || "",
           status: data.status || "",
           avatar_url: data.avatar_url || "",
+          notification_enabled: data.notification_enabled ?? true,
         });
       }
     } catch (error: any) {
@@ -107,6 +110,7 @@ const ProfileSettings = () => {
           username: profile.username,
           status: profile.status,
           avatar_url: profile.avatar_url,
+          notification_enabled: profile.notification_enabled,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);
@@ -209,6 +213,22 @@ const ProfileSettings = () => {
                   }
                   placeholder="Hey there! I am using this chat app"
                   rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-0.5">
+                  <Label htmlFor="notifications">Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive notifications for new messages
+                  </p>
+                </div>
+                <Switch
+                  id="notifications"
+                  checked={profile.notification_enabled}
+                  onCheckedChange={(checked) =>
+                    setProfile({ ...profile, notification_enabled: checked })
+                  }
                 />
               </div>
 

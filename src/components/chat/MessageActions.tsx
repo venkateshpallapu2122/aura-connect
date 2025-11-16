@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit, Trash, History } from "lucide-react";
+import { MoreVertical, Edit, Trash, History, Forward } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +19,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface MessageActionsProps {
   messageId: string;
   messageContent: string;
+  mediaUrl?: string | null;
   isOwn: boolean;
   onEdit: (content: string) => void;
   onDelete: () => void;
+  onForward: () => void;
 }
 
 interface EditHistory {
@@ -29,7 +31,7 @@ interface EditHistory {
   edited_at: string;
 }
 
-const MessageActions = ({ messageId, messageContent, isOwn, onEdit, onDelete }: MessageActionsProps) => {
+const MessageActions = ({ messageId, messageContent, mediaUrl, isOwn, onEdit, onDelete, onForward }: MessageActionsProps) => {
   const [showHistory, setShowHistory] = useState(false);
   const [editHistory, setEditHistory] = useState<EditHistory[]>([]);
 
@@ -61,6 +63,10 @@ const MessageActions = ({ messageId, messageContent, isOwn, onEdit, onDelete }: 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onForward}>
+            <Forward className="w-4 h-4 mr-2" />
+            Forward
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onEdit(messageContent)}>
             <Edit className="w-4 h-4 mr-2" />
             Edit

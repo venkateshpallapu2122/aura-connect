@@ -24,6 +24,9 @@ import MessageReactions from "./MessageReactions";
 import MessageActions from "./MessageActions";
 import ChatExport from "./ChatExport";
 import GroupVoiceChat from "./GroupVoiceChat";
+import MessageForward from "./MessageForward";
+import ThemeCustomizer from "./ThemeCustomizer";
+import ScheduledMessages from "./ScheduledMessages";
 
 interface ChatViewProps {
   userId: string;
@@ -57,6 +60,9 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
+  const [forwardingMessage, setForwardingMessage] = useState<{ id: string; content: string; mediaUrl?: string | null } | null>(null);
+  const [showThemeCustomizer, setShowThemeCustomizer] = useState(false);
+  const [showScheduledMessages, setShowScheduledMessages] = useState(false);
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -499,9 +505,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                         <MessageActions
                           messageId={message.id}
                           messageContent={message.content}
+                          mediaUrl={message.media_url}
                           isOwn={isOwn}
                           onEdit={startEditingMessage.bind(null, message.id)}
                           onDelete={() => handleDeleteMessage(message.id)}
+                          onForward={() => setForwardingMessage({ id: message.id, content: message.content, mediaUrl: message.media_url })}
                         />
                       </div>
                       {message.is_edited && (
@@ -573,6 +581,30 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           </Button>
         </form>
       </div>
+
+      {conversationId && (
+        <>
+          <MessageForward
+            messageId={forwardingMessage?.id || ""}
+            messageContent={forwardingMessage?.content || ""}
+            mediaUrl={forwardingMessage?.mediaUrl}
+            open={!!forwardingMessage}
+            onOpenChange={(open) => !open && setForwardingMessage(null)}
+            currentConversationId={conversationId}
+          />
+          <ThemeCustomizer
+            open={showThemeCustomizer}
+            onOpenChange={setShowThemeCustomizer}
+            userId={userId}
+          />
+          <ScheduledMessages
+            open={showScheduledMessages}
+            onOpenChange={setShowScheduledMessages}
+            conversationId={conversationId}
+            userId={userId}
+          />
+        </>
+      )}
     </div>
   );
 };

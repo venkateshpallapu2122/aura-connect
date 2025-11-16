@@ -262,6 +262,8 @@ export type Database = {
           notification_enabled: boolean | null
           notification_token: string | null
           status: string | null
+          theme_background: string | null
+          theme_color: string | null
           updated_at: string | null
           username: string
         }
@@ -274,6 +276,8 @@ export type Database = {
           notification_enabled?: boolean | null
           notification_token?: string | null
           status?: string | null
+          theme_background?: string | null
+          theme_color?: string | null
           updated_at?: string | null
           username: string
         }
@@ -286,10 +290,53 @@ export type Database = {
           notification_enabled?: boolean | null
           notification_token?: string | null
           status?: string | null
+          theme_background?: string | null
+          theme_color?: string | null
           updated_at?: string | null
           username?: string
         }
         Relationships: []
+      }
+      scheduled_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          media_url: string | null
+          scheduled_time: string
+          sender_id: string
+          sent: boolean | null
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          media_url?: string | null
+          scheduled_time: string
+          sender_id: string
+          sent?: boolean | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          media_url?: string | null
+          scheduled_time?: string
+          sender_id?: string
+          sent?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       voice_participants: {
         Row: {

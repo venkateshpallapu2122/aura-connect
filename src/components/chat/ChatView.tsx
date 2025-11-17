@@ -27,6 +27,9 @@ import GroupVoiceChat from "./GroupVoiceChat";
 import MessageForward from "./MessageForward";
 import ThemeCustomizer from "./ThemeCustomizer";
 import ScheduledMessages from "./ScheduledMessages";
+import MessageReply, { ReplyMessageDisplay } from "./MessageReply";
+import TypingIndicator from "./TypingIndicator";
+import PinnedMessages from "./PinnedMessages";
 
 interface ChatViewProps {
   userId: string;
@@ -42,6 +45,7 @@ interface Message {
   media_url?: string | null;
   deleted_at?: string | null;
   is_edited?: boolean;
+  reply_to_id?: string | null;
   sender?: {
     username: string;
     avatar_url: string | null;
@@ -63,6 +67,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [forwardingMessage, setForwardingMessage] = useState<{ id: string; content: string; mediaUrl?: string | null } | null>(null);
   const [showThemeCustomizer, setShowThemeCustomizer] = useState(false);
   const [showScheduledMessages, setShowScheduledMessages] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState<{ id: string; content: string; sender?: { username: string } } | null>(null);
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -233,6 +238,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           : newMessage.trim(),
         type: mediaUrl ? mediaType : "text",
         media_url: mediaUrl,
+        reply_to_id: replyToMessage?.id,
       });
 
       if (error) throw error;
@@ -240,6 +246,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       setNewMessage("");
       setShowEmojiPicker(false);
       setTyping(false, currentUsername);
+      setReplyToMessage(null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -338,6 +345,58 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     setEditingContent(content);
   };
 
+  const handlePinMessage = async (messageId: string) => {
+    try {
+      // Check if already pinned
+      const { data: existing } = await supabase
+        .from("pinned_messages")
+        .select("id")
+        .eq("message_id", messageId)
+        .eq("conversation_id", conversationId)
+        .single();
+
+      if (existing) {
+        // Unpin
+        await supabase
+          .from("pinned_messages")
+          .delete()
+          .eq("id", existing.id);
+
+        toast({
+          title: "Success",
+          description: "Message unpinned",
+        });
+      } else {
+        // Pin
+        await supabase.from("pinned_messages").insert({
+          message_id: messageId,
+          conversation_id: conversationId!,
+          pinned_by: userId,
+        });
+
+        toast({
+          title: "Success",
+          description: "Message pinned",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    const element = document.getElementById(`message-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.add("bg-primary/10");
+      setTimeout(() => element.classList.remove("bg-primary/10"), 2000);
+    }
+  };
+
   const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -404,7 +463,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           >
             <Search className="w-5 h-5" />
           </Button>
-          {conversationId && <ChatExport conversationId={conversationId} />}
+          {conversationId && <ChatExport conversationId={conversationId} userId={userId} />}
           {conversationType === "group" && (
             <GroupVoiceChat conversationId={conversationId!} userId={userId} />
           )}
@@ -415,8 +474,17 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         <MessageSearch onSearch={handleSearch} onClose={() => { setShowSearch(false); setSearchQuery(""); }} />
       )}
 
+      {conversationId && (
+        <PinnedMessages
+          conversationId={conversationId}
+          userId={userId}
+          onMessageClick={scrollToMessage}
+        />
+      )}
+
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
+        <TypingIndicator typingUsers={typingUsers} />
         <div className="space-y-4">
           {filteredMessages.map((message) => {
             const isOwn = message.sender_id === userId;
@@ -435,7 +503,8 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
             return (
               <div
                 key={message.id}
-                className={`flex items-start gap-2 animate-in group ${
+                id={`message-${message.id}`}
+                className={`flex items-start gap-2 animate-in group transition-colors ${
                   isOwn ? "flex-row-reverse" : ""
                 }`}
               >
@@ -453,6 +522,12 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                         : "bg-chat-bubble-received text-chat-bubble-received-foreground"
                     }`}
                   >
+                  {message.reply_to_id && (
+                    <ReplyMessageDisplay
+                      replyToId={message.reply_to_id}
+                      onReplyClick={() => scrollToMessage(message.reply_to_id!)}
+                    />
+                  )}
                   {message.type === "image" && message.media_url ? (
                     <img
                       src={message.media_url}
@@ -510,6 +585,8 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                           onEdit={startEditingMessage.bind(null, message.id)}
                           onDelete={() => handleDeleteMessage(message.id)}
                           onForward={() => setForwardingMessage({ id: message.id, content: message.content, mediaUrl: message.media_url })}
+                          onReply={() => setReplyToMessage({ id: message.id, content: message.content, sender: message.sender })}
+                          onPin={() => handlePinMessage(message.id)}
                         />
                       </div>
                       {message.is_edited && (
@@ -544,6 +621,12 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
       {/* Message Input */}
       <div className="p-4 border-t border-border bg-chat-header space-y-2">
+        {replyToMessage && (
+          <MessageReply
+            replyTo={replyToMessage}
+            onCancel={() => setReplyToMessage(null)}
+          />
+        )}
         <MediaUpload onMediaUploaded={handleMediaUploaded} userId={userId} />
         <form onSubmit={(e) => sendMessage(e)} className="flex items-center gap-2">
           <VoiceRecorder onVoiceSent={handleVoiceSent} userId={userId} />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit, Trash, History, Forward } from "lucide-react";
+import { MoreVertical, Edit, Trash, History, Forward, Reply, Pin, Copy } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 interface MessageActionsProps {
   messageId: string;
@@ -24,6 +25,8 @@ interface MessageActionsProps {
   onEdit: (content: string) => void;
   onDelete: () => void;
   onForward: () => void;
+  onReply: () => void;
+  onPin: () => void;
 }
 
 interface EditHistory {
@@ -31,9 +34,20 @@ interface EditHistory {
   edited_at: string;
 }
 
-const MessageActions = ({ messageId, messageContent, mediaUrl, isOwn, onEdit, onDelete, onForward }: MessageActionsProps) => {
+const MessageActions = ({ 
+  messageId, 
+  messageContent, 
+  mediaUrl, 
+  isOwn, 
+  onEdit, 
+  onDelete, 
+  onForward,
+  onReply,
+  onPin 
+}: MessageActionsProps) => {
   const [showHistory, setShowHistory] = useState(false);
   const [editHistory, setEditHistory] = useState<EditHistory[]>([]);
+  const { toast } = useToast();
 
   const loadEditHistory = async () => {
     const { data } = await supabase
@@ -48,7 +62,13 @@ const MessageActions = ({ messageId, messageContent, mediaUrl, isOwn, onEdit, on
     }
   };
 
-  if (!isOwn) return null;
+  const copyMessage = () => {
+    navigator.clipboard.writeText(messageContent);
+    toast({
+      title: "Copied",
+      description: "Message copied to clipboard",
+    });
+  };
 
   return (
     <>
@@ -62,23 +82,39 @@ const MessageActions = ({ messageId, messageContent, mediaUrl, isOwn, onEdit, on
             <MoreVertical className="w-4 h-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={onReply}>
+            <Reply className="w-4 h-4 mr-2" />
+            Reply
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={copyMessage}>
+            <Copy className="w-4 h-4 mr-2" />
+            Copy
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onForward}>
             <Forward className="w-4 h-4 mr-2" />
             Forward
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onEdit(messageContent)}>
-            <Edit className="w-4 h-4 mr-2" />
-            Edit
+          <DropdownMenuItem onClick={onPin}>
+            <Pin className="w-4 h-4 mr-2" />
+            Pin
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={loadEditHistory}>
-            <History className="w-4 h-4 mr-2" />
-            Edit History
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDelete} className="text-destructive">
-            <Trash className="w-4 h-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
+          {isOwn && (
+            <>
+              <DropdownMenuItem onClick={() => onEdit(messageContent)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={loadEditHistory}>
+                <History className="w-4 h-4 mr-2" />
+                Edit History
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

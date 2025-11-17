@@ -1,50 +1,61 @@
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Download, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ChatExportProps {
   conversationId: string;
+  userId: string;
 }
 
-const ChatExport = ({ conversationId }: ChatExportProps) => {
+const ChatExport = ({ conversationId, userId }: ChatExportProps) => {
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [open, setOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const exportAsText = async () => {
+  const exportChat = async () => {
+    setExporting(true);
+
     try {
-      const { data: messages } = await supabase
+      const { data: messages, error } = await supabase
         .from("messages")
-        .select("*, profiles(username)")
+        .select("*, sender:profiles(username, avatar_url)")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
-      if (!messages) throw new Error("No messages found");
+      if (error) throw error;
 
-      const textContent = messages
-        .map((msg: any) => {
-          const timestamp = new Date(msg.created_at).toLocaleString();
-          const sender = msg.profiles?.username || "Unknown";
-          return `[${timestamp}] ${sender}: ${msg.content}`;
-        })
-        .join("\n");
+      const exportData = {
+        version: "1.0",
+        exported_at: new Date().toISOString(),
+        conversation_id: conversationId,
+        messages,
+      };
 
-      const blob = new Blob([textContent], { type: "text/plain" });
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `chat-export-${conversationId}.txt`;
+      a.download = `chat-backup-${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
 
       toast({
         title: "Success",
-        description: "Chat exported as text file",
+        description: "Chat exported successfully",
       });
     } catch (error: any) {
       toast({
@@ -52,86 +63,122 @@ const ChatExport = ({ conversationId }: ChatExportProps) => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setExporting(false);
     }
   };
 
-  const exportAsPDF = async () => {
+  const importChat = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+
     try {
-      const { data: messages } = await supabase
+      const text = await file.text();
+      const exportData = JSON.parse(text);
+
+      if (!exportData.messages || !Array.isArray(exportData.messages)) {
+        throw new Error("Invalid backup file format");
+      }
+
+      // Import messages
+      const messagesToImport = exportData.messages.map((msg: any) => ({
+        conversation_id: conversationId,
+        sender_id: userId,
+        content: msg.content,
+        type: msg.type || "text",
+        media_url: msg.media_url,
+      }));
+
+      const { error } = await supabase
         .from("messages")
-        .select("*, profiles(username)")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+        .insert(messagesToImport);
 
-      if (!messages) throw new Error("No messages found");
-
-      // Create HTML content for PDF
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <title>Chat Export</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              .message { margin-bottom: 15px; }
-              .timestamp { color: #666; font-size: 12px; }
-              .sender { font-weight: bold; }
-            </style>
-          </head>
-          <body>
-            <h1>Chat Export</h1>
-            ${messages
-              .map(
-                (msg: any) => `
-              <div class="message">
-                <div class="timestamp">${new Date(msg.created_at).toLocaleString()}</div>
-                <div><span class="sender">${msg.profiles?.username || "Unknown"}:</span> ${msg.content}</div>
-              </div>
-            `
-              )
-              .join("")}
-          </body>
-        </html>
-      `;
-
-      const blob = new Blob([htmlContent], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `chat-export-${conversationId}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
+      if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Chat exported as HTML (open in browser and print to PDF)",
+        description: `Restored ${messagesToImport.length} messages`,
       });
+
+      setOpen(false);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
         <Button variant="ghost" size="icon">
           <Download className="w-5 h-5" />
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={exportAsText}>
-          Export as Text
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportAsPDF}>
-          Export as HTML/PDF
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Backup & Restore</DialogTitle>
+          <DialogDescription>
+            Export your chat history or restore from a backup file
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Button
+            onClick={exportChat}
+            disabled={exporting}
+            className="w-full"
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Export Chat
+              </>
+            )}
+          </Button>
+          <div className="relative">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              onChange={importChat}
+              className="hidden"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              variant="outline"
+              className="w-full"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Restoring...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Restore from Backup
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

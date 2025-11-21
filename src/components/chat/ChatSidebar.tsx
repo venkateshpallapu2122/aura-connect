@@ -160,7 +160,10 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
       // Create new conversation
       const { data: conversation, error: convError } = await supabase
         .from("conversations")
-        .insert({ type: "direct" })
+        .insert({ 
+          type: "direct",
+          created_by: userId 
+        })
         .select()
         .single();
 

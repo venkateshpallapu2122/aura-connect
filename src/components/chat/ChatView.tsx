@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Smile, MessageCircle, Search, Check, CheckCheck } from "lucide-react";
+import { Send, Smile, MessageCircle, Search, Check, CheckCheck, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
@@ -13,6 +13,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -470,6 +481,54 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
             <Search className="w-5 h-5" />
           </Button>
           {conversationId && <ChatExport conversationId={conversationId} userId={userId} />}
+          {conversationId && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all messages in this conversation for everyone. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase
+                          .from("messages")
+                          .delete()
+                          .eq("conversation_id", conversationId);
+
+                        if (error) throw error;
+
+                        loadMessages();
+                        toast({
+                          title: "Chat cleared",
+                          description: "All messages have been deleted",
+                        });
+                      } catch (error: unknown) {
+                        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+                        toast({
+                          title: "Error",
+                          description: errorMessage,
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    Clear Chat
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           {conversationType === "group" && (
             <GroupVoiceChat conversationId={conversationId!} userId={userId} />
           )}

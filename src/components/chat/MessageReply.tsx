@@ -58,6 +58,7 @@ export const ReplyMessageDisplay = ({ replyToId, onReplyClick }: ReplyMessageDis
         .single();
 
       if (data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setReplyMessage(data as any);
       }
     };

@@ -49,6 +49,7 @@ const PinnedMessages = ({ conversationId, userId, onMessageClick }: PinnedMessag
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   const loadPinnedMessages = async () => {
@@ -66,6 +67,7 @@ const PinnedMessages = ({ conversationId, userId, onMessageClick }: PinnedMessag
       .order("pinned_at", { ascending: false });
 
     if (data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setPinnedMessages(data as any);
     }
   };
@@ -83,10 +85,11 @@ const PinnedMessages = ({ conversationId, userId, onMessageClick }: PinnedMessag
         title: "Success",
         description: "Message unpinned",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

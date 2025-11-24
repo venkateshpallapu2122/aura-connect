@@ -55,7 +55,7 @@ interface Message {
 const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [otherUser, setOtherUser] = useState<any>(null);
+  const [otherUser, setOtherUser] = useState<{ id: string; username: string; avatar_url: string | null; is_online: boolean } | null>(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [conversationType, setConversationType] = useState<string>("direct");
   const [conversationName, setConversationName] = useState<string>("");
@@ -104,6 +104,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   useEffect(() => {
@@ -114,6 +115,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         markAsRead(msg.id);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   useEffect(() => {
@@ -247,21 +249,22 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       setShowEmojiPicker(false);
       setTyping(false, currentUsername);
       setReplyToMessage(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
   const handleMediaUploaded = (url: string, type: "image" | "file") => {
-    sendMessage(new Event("submit") as any, url, type);
+    sendMessage(new Event("submit") as React.FormEvent, url, type);
   };
 
   const handleVoiceSent = (url: string) => {
-    sendMessage(new Event("submit") as any, url, "voice");
+    sendMessage(new Event("submit") as React.FormEvent, url, "voice");
   };
 
   const handleSearch = (query: string) => {
@@ -309,10 +312,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         setEditingContent("");
         loadMessages();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -331,10 +335,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         title: "Success",
         description: "Message deleted",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -379,10 +384,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           description: "Message pinned",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -403,7 +409,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }
   };
 
-  const addEmoji = (emoji: any) => {
+  const addEmoji = (emoji: { native: string }) => {
     setNewMessage((prev) => prev + emoji.native);
   };
 

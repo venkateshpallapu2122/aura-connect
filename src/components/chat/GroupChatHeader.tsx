@@ -37,6 +37,7 @@ const GroupChatHeader = ({
   useEffect(() => {
     loadParticipants();
     checkAdminStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   const loadParticipants = async () => {

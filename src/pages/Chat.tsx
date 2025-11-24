@@ -40,6 +40,7 @@ const Chat = () => {
         updateOnlineStatus(user.id, false);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const updateOnlineStatus = async (userId: string, isOnline: boolean) => {

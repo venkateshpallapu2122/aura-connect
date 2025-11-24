@@ -51,6 +51,7 @@ const GroupVoiceChat = ({ conversationId, userId }: GroupVoiceChatProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInCall, sessionId]);
 
   const loadParticipants = async () => {
@@ -129,10 +130,11 @@ const GroupVoiceChat = ({ conversationId, userId }: GroupVoiceChatProps) => {
         title: "Joined voice chat",
         description: "You can now talk with other participants",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

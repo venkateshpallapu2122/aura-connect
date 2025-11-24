@@ -65,6 +65,7 @@ const ScheduledMessages = ({
         supabase.removeChannel(channel);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, conversationId]);
 
   const loadScheduledMessages = async () => {

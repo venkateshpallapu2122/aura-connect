@@ -43,6 +43,7 @@ const MessageReactions = ({ messageId, userId }: MessageReactionsProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messageId]);
 
   const loadReactions = async () => {
@@ -56,7 +57,7 @@ const MessageReactions = ({ messageId, userId }: MessageReactionsProps) => {
     }
   };
 
-  const addReaction = async (emoji: any) => {
+  const addReaction = async (emoji: { native: string }) => {
     const existingReaction = reactions.find(
       (r) => r.emoji === emoji.native && r.user_id === userId
     );

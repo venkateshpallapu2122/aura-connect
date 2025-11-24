@@ -111,10 +111,11 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
 
       onVoiceSent(publicUrl);
       deleteRecording();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

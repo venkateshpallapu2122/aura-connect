@@ -88,6 +88,7 @@ const MediaUpload = ({ onMediaUploaded, userId }: MediaUploadProps) => {
             );
             setProgress(percentCompleted);
           },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
       if (uploadError) throw uploadError;
@@ -104,10 +105,11 @@ const MediaUpload = ({ onMediaUploaded, userId }: MediaUploadProps) => {
         title: "Success",
         description: "Media uploaded successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

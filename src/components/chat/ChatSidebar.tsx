@@ -36,7 +36,7 @@ interface Conversation {
 
 const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: ChatSidebarProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<{ id: string; username: string; avatar_url: string | null; status?: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
   const navigate = useNavigate();
@@ -66,6 +66,7 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   const loadConversations = async () => {
@@ -185,10 +186,11 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
         title: "Chat created",
         description: "Start your conversation!",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

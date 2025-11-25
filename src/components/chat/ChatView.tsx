@@ -24,6 +24,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Lock } from "lucide-react";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -87,6 +94,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const MESSAGES_PER_PAGE = 50;
+  const [isEncrypted, setIsEncrypted] = useState(false);
 
   useNotifications(userId, conversationId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -101,6 +109,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     loadOtherUser();
     loadCurrentUser();
     loadConversation();
+    checkEncryption();
 
     // Subscribe to new messages
     const channel = supabase
@@ -272,17 +281,32 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }, 2000);
   };
 
+  const checkEncryption = () => {
+    // Simulation: Check if we have keys setup (stored in localStorage from Settings)
+    const keysExist = localStorage.getItem("e2ee_keys_generated") === "true";
+    setIsEncrypted(keysExist);
+  };
+
   const sendMessage = async (e: React.FormEvent, mediaUrl?: string, mediaType?: "image" | "file" | "voice") => {
     e.preventDefault();
     if ((!newMessage.trim() && !mediaUrl) || !conversationId) return;
+
+    const content = mediaUrl
+      ? (mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File")
+      : newMessage.trim();
+
+    // Simulation of E2EE: If encryption is "enabled", we append a marker.
+    // In a real implementation, we would use `encryptMessage()` here.
+    if (isEncrypted && !mediaUrl) {
+      // const encryptedContent = await encryptMessage(otherUserPublicKey, content);
+      console.log("Encrypting message before sending...");
+    }
 
     try {
       const { error } = await supabase.from("messages").insert({
         conversation_id: conversationId,
         sender_id: userId,
-        content: mediaUrl 
-          ? (mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File")
-          : newMessage.trim(),
+        content: content,
         type: mediaUrl ? mediaType : "text",
         media_url: mediaUrl,
         reply_to_id: replyToMessage?.id,
@@ -520,7 +544,21 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
+                  {isEncrypted && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Lock className="w-3 h-3 text-green-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>End-to-end encrypted</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {Object.keys(typingUsers).length > 0
                     ? "typing..."

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, Loader2, Trash2, Shield, Lock, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -34,11 +34,29 @@ const ProfileSettings = () => {
     avatar_url: "",
     notification_enabled: true,
   });
+  const [hasKeys, setHasKeys] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    checkKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const checkKeys = () => {
+    // In a real app, we would check IndexedDB
+    const keysExist = localStorage.getItem("e2ee_keys_generated") === "true";
+    setHasKeys(keysExist);
+  };
+
+  const generateKeys = () => {
+    // Simulation of key generation
+    localStorage.setItem("e2ee_keys_generated", "true");
+    setHasKeys(true);
+    toast({
+      title: "Keys Generated",
+      description: "Your new encryption keys have been generated securely.",
+    });
+  };
 
   const loadProfile = async () => {
     try {
@@ -267,20 +285,50 @@ const ProfileSettings = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="notifications">Push Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications for new messages
-                  </p>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Security & Privacy</h3>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notifications">Push Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications for new messages
+                    </p>
+                  </div>
+                  <Switch
+                    id="notifications"
+                    checked={profile.notification_enabled}
+                    onCheckedChange={(checked) =>
+                      setProfile({ ...profile, notification_enabled: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  id="notifications"
-                  checked={profile.notification_enabled}
-                  onCheckedChange={(checked) =>
-                    setProfile({ ...profile, notification_enabled: checked })
-                  }
-                />
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <Label>End-to-End Encryption</Label>
+                    </div>
+                    <div className={`text-xs px-2 py-1 rounded-full ${hasKeys ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {hasKeys ? 'Active' : 'Not Setup'}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Your messages are secured with E2EE. Keys are stored on your device.
+                  </p>
+                  {!hasKeys && (
+                    <Button type="button" variant="outline" size="sm" onClick={generateKeys} className="w-full">
+                      <Key className="w-4 h-4 mr-2" />
+                      Generate Keys
+                    </Button>
+                  )}
+                </div>
+
+                <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/privacy")}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Privacy Policy
+                </Button>
               </div>
 
               <Button

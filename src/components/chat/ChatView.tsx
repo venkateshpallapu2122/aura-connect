@@ -84,13 +84,20 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { typingUsers, setTyping } = useTypingIndicator(conversationId, userId);
   const { readReceipts, markAsRead } = useReadReceipts(conversationId, userId);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const MESSAGES_PER_PAGE = 50;
+
   useNotifications(userId, conversationId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (!conversationId) return;
 
-    loadMessages();
+    setMessages([]);
+    setPage(0);
+    setHasMore(true);
+    loadMessages(0);
     loadOtherUser();
     loadCurrentUser();
     loadConversation();
@@ -119,7 +126,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   }, [conversationId]);
 
   useEffect(() => {
-    scrollToBottom();
+    // Only auto-scroll to bottom if we are on the first page
+    if (page === 0) {
+      scrollToBottom();
+    }
     // Mark messages as read when viewing them
     messages.forEach((msg) => {
       if (msg.sender_id !== userId) {
@@ -140,16 +150,24 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }
   }, [searchQuery, messages]);
 
-  const loadMessages = async () => {
+  const loadMessages = async (pageIndex: number) => {
     if (!conversationId) return;
+
+    const from = pageIndex * MESSAGES_PER_PAGE;
+    const to = from + MESSAGES_PER_PAGE - 1;
 
     const { data } = await supabase
       .from("messages")
       .select("*")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (data) {
+      if (data.length < MESSAGES_PER_PAGE) {
+        setHasMore(false);
+      }
+
       // Load sender profiles for all messages
       const messagesWithProfiles = await Promise.all(
         data.map(async (msg) => {
@@ -165,7 +183,23 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           };
         })
       );
-      setMessages(messagesWithProfiles);
+
+      setMessages((prev) => {
+        const newMessages = messagesWithProfiles.reverse();
+        // Remove duplicates just in case
+        const existingIds = new Set(prev.map(m => m.id));
+        const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m.id));
+        return [...uniqueNewMessages, ...prev];
+      });
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    if (scrollTop === 0 && hasMore) {
+      const newPage = page + 1;
+      setPage(newPage);
+      loadMessages(newPage);
     }
   };
 
@@ -283,12 +317,36 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   };
 
   const highlightText = (text: string, highlight: string) => {
-    if (!highlight.trim()) return text;
+    if (!highlight.trim()) return renderText(text);
     const regex = new RegExp(`(${highlight})`, "gi");
     const parts = text.split(regex);
     return parts.map((part, i) => 
-      regex.test(part) ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600">{part}</mark> : part
+      regex.test(part) ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600">{part}</mark> : renderText(part)
     );
+  };
+
+  const renderText = (text: string) => {
+    // Regex to find URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline hover:opacity-80 break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   const handleEditMessage = async (messageId: string) => {
@@ -548,9 +606,28 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea
+        className="flex-1 p-4"
+        onScrollCapture={handleScroll}
+      >
         <TypingIndicator typingUsers={typingUsers} />
         <div className="space-y-4">
+          {hasMore && (
+            <div className="text-center py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const newPage = page + 1;
+                  setPage(newPage);
+                  loadMessages(newPage);
+                }}
+                disabled={!hasMore}
+              >
+                Load older messages
+              </Button>
+            </div>
+          )}
           {filteredMessages.map((message) => {
             const isOwn = message.sender_id === userId;
             const messageReads = readReceipts[message.id] || [];

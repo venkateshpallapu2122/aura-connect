@@ -30,8 +30,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Lock } from "lucide-react";
+import { Lock, Ban } from "lucide-react";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useNotifications } from "@/hooks/useNotifications";
 import MediaUpload from "./MediaUpload";
@@ -95,6 +96,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [page, setPage] = useState(0);
   const MESSAGES_PER_PAGE = 50;
   const [isEncrypted, setIsEncrypted] = useState(false);
+  const { blockUser, unblockUser, isBlocked } = useBlockedUsers();
 
   useNotifications(userId, conversationId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -149,15 +151,19 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   }, [messages]);
 
   useEffect(() => {
+    let filtered = messages;
+
+    // Filter blocked users
+    filtered = filtered.filter(msg => !isBlocked(msg.sender_id));
+
     if (searchQuery) {
-      const filtered = messages.filter((msg) =>
+      filtered = filtered.filter((msg) =>
         msg.content.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredMessages(filtered);
-    } else {
-      setFilteredMessages(messages);
     }
-  }, [searchQuery, messages]);
+
+    setFilteredMessages(filtered);
+  }, [searchQuery, messages, isBlocked]); // Added isBlocked to dependency array implies re-render on block change if hook returns new function/value
 
   const loadMessages = async (pageIndex: number) => {
     if (!conversationId) return;
@@ -282,9 +288,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   };
 
   const checkEncryption = () => {
-    // Simulation: Check if we have keys setup (stored in localStorage from Settings)
-    const keysExist = localStorage.getItem("e2ee_keys_generated") === "true";
-    setIsEncrypted(keysExist);
+    // Placeholder: Check if we have keys setup (stored in IndexedDB from Settings)
+    // In a real E2EE app, we would also check if the recipient has a public key.
+    // Currently, we disable the lock icon to avoid deception as we cannot exchange keys.
+    setIsEncrypted(false);
   };
 
   const sendMessage = async (e: React.FormEvent, mediaUrl?: string, mediaType?: "image" | "file" | "voice") => {
@@ -294,13 +301,6 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     const content = mediaUrl
       ? (mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File")
       : newMessage.trim();
-
-    // Simulation of E2EE: If encryption is "enabled", we append a marker.
-    // In a real implementation, we would use `encryptMessage()` here.
-    if (isEncrypted && !mediaUrl) {
-      // const encryptedContent = await encryptMessage(otherUserPublicKey, content);
-      console.log("Encrypting message before sending...");
-    }
 
     try {
       const { error } = await supabase.from("messages").insert({
@@ -567,6 +567,24 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                     : "Offline"}
                 </p>
               </div>
+              {otherUser && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (isBlocked(otherUser.id)) {
+                      unblockUser(otherUser.id);
+                      toast({ title: "User Unblocked", description: "You will now see messages from this user." });
+                    } else {
+                      blockUser(otherUser.id);
+                      toast({ title: "User Blocked", description: "You will no longer see messages from this user.", variant: "destructive" });
+                    }
+                  }}
+                  title={isBlocked(otherUser.id) ? "Unblock User" : "Block User"}
+                >
+                  <Ban className={`w-5 h-5 ${isBlocked(otherUser.id) ? "text-red-500" : "text-muted-foreground"}`} />
+                </Button>
+              )}
             </>
           )}
           <Button

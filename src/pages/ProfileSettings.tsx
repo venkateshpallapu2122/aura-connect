@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Upload, Loader2, Trash2, Shield, Lock, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { generateKeyPair } from "@/lib/crypto";
+import { storeKeyPair, getPublicKey } from "@/lib/keyStorage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,20 +44,28 @@ const ProfileSettings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const checkKeys = () => {
-    // In a real app, we would check IndexedDB
-    const keysExist = localStorage.getItem("e2ee_keys_generated") === "true";
-    setHasKeys(keysExist);
+  const checkKeys = async () => {
+    const publicKey = await getPublicKey();
+    setHasKeys(!!publicKey);
   };
 
-  const generateKeys = () => {
-    // Simulation of key generation
-    localStorage.setItem("e2ee_keys_generated", "true");
-    setHasKeys(true);
-    toast({
-      title: "Keys Generated",
-      description: "Your new encryption keys have been generated securely.",
-    });
+  const generateKeys = async () => {
+    try {
+      const keyPair = await generateKeyPair();
+      await storeKeyPair(keyPair);
+      setHasKeys(true);
+      toast({
+        title: "Keys Generated",
+        description: "Your new encryption keys have been generated securely and stored on your device.",
+      });
+    } catch (error) {
+      console.error("Failed to generate keys", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate encryption keys.",
+        variant: "destructive",
+      });
+    }
   };
 
   const loadProfile = async () => {

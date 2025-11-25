@@ -26,10 +26,10 @@ const PrivacyPolicy = () => {
         <section className="space-y-4 bg-card p-6 rounded-xl border border-border shadow-sm">
           <div className="flex items-center gap-2 text-xl font-semibold">
             <Lock className="w-6 h-6 text-green-500" />
-            <h2>End-to-End Encryption</h2>
+            <h2>Encryption & Security</h2>
           </div>
           <p className="text-muted-foreground">
-            Our messaging platform utilizes state-of-the-art End-to-End Encryption (E2EE). This means that your messages are encrypted on your device and can only be decrypted by the intended recipient. We, as the service provider, cannot read your messages. Keys are generated securely on your device and never leave it unencrypted.
+            We utilize strong encryption in transit (TLS) and at rest to protect your data. End-to-End Encryption (E2EE) features are currently in development to provide even greater privacy. Your security is our top priority.
           </p>
         </section>
 

@@ -161,7 +161,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
           return {
             ...msg,
-            sender: profile,
+            sender: profile || { username: "Deleted User", avatar_url: null },
           };
         })
       );
@@ -176,7 +176,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       .eq("id", message.sender_id)
       .single();
 
-    setMessages((prev) => [...prev, { ...message, sender: profile }]);
+    setMessages((prev) => [...prev, { ...message, sender: profile || { username: "Deleted User", avatar_url: null } }]);
   };
 
   const loadCurrentUser = async () => {

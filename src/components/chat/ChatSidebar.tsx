@@ -117,7 +117,7 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
 
             return {
               ...convo,
-              otherUser,
+              otherUser: otherUser || { username: "Deleted User", avatar_url: null, is_online: false },
             };
           }
         }

@@ -57,7 +57,7 @@ const GroupChatHeader = ({
 
           return {
             user_id: p.user_id,
-            username: profile?.username || "Unknown",
+            username: profile?.username || "Deleted User",
             avatar_url: profile?.avatar_url || null,
           };
         })

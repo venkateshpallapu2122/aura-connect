@@ -35,6 +35,10 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
+      if (audioContextRef.current) {
+        await audioContextRef.current.close();
+      }
+
       const audioContext = new AudioContext();
       audioContextRef.current = audioContext;
       const analyser = audioContext.createAnalyser();

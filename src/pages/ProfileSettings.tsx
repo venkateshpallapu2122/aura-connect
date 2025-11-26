@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -38,16 +39,10 @@ const ProfileSettings = () => {
   });
   const [hasKeys, setHasKeys] = useState(false);
 
-  useEffect(() => {
-    loadProfile();
-    checkKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const checkKeys = async () => {
+  const checkKeys = React.useCallback(async () => {
     const publicKey = await getPublicKey();
     setHasKeys(!!publicKey);
-  };
+  }, []);
 
   const generateKeys = async () => {
     try {
@@ -68,7 +63,7 @@ const ProfileSettings = () => {
     }
   };
 
-  const loadProfile = async () => {
+  const loadProfile = React.useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -96,7 +91,12 @@ const ProfileSettings = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadProfile();
+    checkKeys();
+  }, [loadProfile, checkKeys]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {

@@ -8,24 +8,65 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, Loader2, Trash2, Shield, Lock, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { generateKeyPair } from "@/lib/crypto";
+import { storeKeyPair, getPublicKey } from "@/lib/keyStorage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [profile, setProfile] = useState({
     username: "",
     status: "",
     avatar_url: "",
     notification_enabled: true,
   });
+  const [hasKeys, setHasKeys] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    checkKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const checkKeys = async () => {
+    const publicKey = await getPublicKey();
+    setHasKeys(!!publicKey);
+  };
+
+  const generateKeys = async () => {
+    try {
+      const keyPair = await generateKeyPair();
+      await storeKeyPair(keyPair);
+      setHasKeys(true);
+      toast({
+        title: "Keys Generated",
+        description: "Your new encryption keys have been generated securely and stored on your device.",
+      });
+    } catch (error) {
+      console.error("Failed to generate keys", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate encryption keys.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -47,10 +88,11 @@ const ProfileSettings = () => {
           notification_enabled: data.notification_enabled ?? true,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -85,10 +127,11 @@ const ProfileSettings = () => {
         title: "Success",
         description: "Avatar uploaded successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -123,14 +166,50 @@ const ProfileSettings = () => {
       });
 
       navigate("/chat");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Delete profile data
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      // Sign out
+      await supabase.auth.signOut();
+
+      toast({
+        title: "Account deleted",
+        description: "Your account has been successfully deleted.",
+      });
+
+      navigate("/auth");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -216,20 +295,50 @@ const ProfileSettings = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="notifications">Push Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications for new messages
-                  </p>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Security & Privacy</h3>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notifications">Push Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications for new messages
+                    </p>
+                  </div>
+                  <Switch
+                    id="notifications"
+                    checked={profile.notification_enabled}
+                    onCheckedChange={(checked) =>
+                      setProfile({ ...profile, notification_enabled: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  id="notifications"
-                  checked={profile.notification_enabled}
-                  onCheckedChange={(checked) =>
-                    setProfile({ ...profile, notification_enabled: checked })
-                  }
-                />
+
+                <div className="p-4 border rounded-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <Label>End-to-End Encryption</Label>
+                    </div>
+                    <div className={`text-xs px-2 py-1 rounded-full ${hasKeys ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {hasKeys ? 'Active' : 'Not Setup'}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Your messages are secured with E2EE. Keys are stored on your device.
+                  </p>
+                  {!hasKeys && (
+                    <Button type="button" variant="outline" size="sm" onClick={generateKeys} className="w-full">
+                      <Key className="w-4 h-4 mr-2" />
+                      Generate Keys
+                    </Button>
+                  )}
+                </div>
+
+                <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/privacy")}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Privacy Policy
+                </Button>
               </div>
 
               <Button
@@ -247,6 +356,48 @@ const ProfileSettings = () => {
                 )}
               </Button>
             </form>
+
+            <div className="mt-8 pt-8 border-t">
+              <h3 className="text-lg font-medium text-destructive mb-2">Danger Zone</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Deleting your account is permanent and cannot be undone.
+              </p>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="w-full">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete your
+                      account and remove your data from our servers.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccount}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        "Delete Account"
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </CardContent>
         </Card>
       </div>

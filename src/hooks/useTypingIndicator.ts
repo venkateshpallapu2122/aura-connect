@@ -23,6 +23,7 @@ export const useTypingIndicator = (conversationId: string | null, userId: string
         const typingState: Record<string, TypingState> = {};
 
         Object.keys(state).forEach((key) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const presences = state[key] as any[];
           if (presences.length > 0) {
             const presence = presences[0] as TypingState;

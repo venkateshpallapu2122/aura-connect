@@ -57,10 +57,11 @@ const ChatExport = ({ conversationId, userId }: ChatExportProps) => {
         title: "Success",
         description: "Chat exported successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -83,7 +84,7 @@ const ChatExport = ({ conversationId, userId }: ChatExportProps) => {
       }
 
       // Import messages
-      const messagesToImport = exportData.messages.map((msg: any) => ({
+      const messagesToImport = exportData.messages.map((msg: { content: string; type: string; media_url: string }) => ({
         conversation_id: conversationId,
         sender_id: userId,
         content: msg.content,
@@ -103,10 +104,11 @@ const ChatExport = ({ conversationId, userId }: ChatExportProps) => {
       });
 
       setOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

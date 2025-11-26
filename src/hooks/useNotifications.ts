@@ -18,6 +18,7 @@ export const useNotifications = (userId: string, currentConversationId: string |
           table: "messages",
         },
         async (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const message = payload.new as any;
           
           // Don't notify for own messages or messages in current conversation
@@ -53,6 +54,7 @@ export const useNotifications = (userId: string, currentConversationId: string |
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, currentConversationId]);
 
   const requestNotificationPermission = async () => {

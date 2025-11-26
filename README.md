@@ -1,73 +1,55 @@
-# Welcome to your Lovable project
+# Chat Application
 
-## Project info
+A modern, full-featured chat application built with React, Vite, Tailwind CSS, and Supabase.
 
-**URL**: https://lovable.dev/projects/dbdfa1e5-c3f8-4513-975d-f91b2a4f8f1a
+## Features
 
-## How can I edit this code?
+-   **Real-time Messaging**: Instant delivery of messages using Supabase Realtime.
+-   **Authentication**: Secure email/password login and signup.
+-   **Media Sharing**: Share images, files, and voice messages.
+-   **Group Chats**: Create and manage group conversations.
+-   **Message Management**: Edit, delete, reply, forward, and pin messages.
+-   **Read Receipts**: See when your messages have been read.
+-   **Typing Indicators**: See when others are typing.
+-   **Search**: Search through message history and conversations.
+-   **Theme Customization**: Personalize your chat experience with custom themes and backgrounds.
+-   **Pagination**: Infinite scroll for seamless message history navigation.
+-   **Offline Support**: Visual indicator when connection is lost.
+-   **Robustness**: Graceful handling of deleted users and network errors.
+-   **Profile Settings**: Manage your profile, avatar, and account status. Includes "Delete Account" functionality.
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+-   **Frontend**: React, TypeScript, Vite
+-   **UI Library**: shadcn/ui
+-   **Styling**: Tailwind CSS
+-   **Backend**: Supabase (PostgreSQL, Auth, Storage, Realtime)
+-   **Icons**: Lucide React
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/dbdfa1e5-c3f8-4513-975d-f91b2a4f8f1a) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Setup
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
 Follow these steps:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Step 1: Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Step 2: Navigate to the project directory
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Step 3: Install the necessary dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project is ready to be deployed on [Vercel](https://vercel.com) or [Netlify](https://www.netlify.com). Ensure you set up the required environment variables for Supabase connection.
 
-**Use GitHub Codespaces**
+## License
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/dbdfa1e5-c3f8-4513-975d-f91b2a4f8f1a) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+MIT

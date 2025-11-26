@@ -42,6 +42,7 @@ const ThemeCustomizer = ({ open, onOpenChange, userId }: ThemeCustomizerProps) =
     if (open) {
       loadTheme();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const loadTheme = async () => {
@@ -66,7 +67,9 @@ const ThemeCustomizer = ({ open, onOpenChange, userId }: ThemeCustomizerProps) =
 
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
-      let h = 0, s = 0, l = (max + min) / 2;
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
 
       if (max !== min) {
         const d = max - min;

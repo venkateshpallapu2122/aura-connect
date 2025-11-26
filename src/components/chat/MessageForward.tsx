@@ -47,6 +47,7 @@ const MessageForward = ({
     if (open) {
       loadConversations();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const loadConversations = async () => {
@@ -71,7 +72,9 @@ const MessageForward = ({
 
     if (data && !error) {
       const convs = data
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((p: any) => p.conversations)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((c: any) => c !== null);
       setConversations(convs);
     }

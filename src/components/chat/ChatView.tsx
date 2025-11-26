@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Smile, MessageCircle, Search, Check, CheckCheck } from "lucide-react";
+import { Send, Smile, MessageCircle, Search, Check, CheckCheck, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
@@ -13,7 +13,26 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Lock, Ban } from "lucide-react";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useNotifications } from "@/hooks/useNotifications";
 import MediaUpload from "./MediaUpload";
@@ -55,7 +74,7 @@ interface Message {
 const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [otherUser, setOtherUser] = useState<any>(null);
+  const [otherUser, setOtherUser] = useState<{ id: string; username: string; avatar_url: string | null; is_online: boolean } | null>(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [conversationType, setConversationType] = useState<string>("direct");
   const [conversationName, setConversationName] = useState<string>("");
@@ -73,16 +92,26 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { typingUsers, setTyping } = useTypingIndicator(conversationId, userId);
   const { readReceipts, markAsRead } = useReadReceipts(conversationId, userId);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const MESSAGES_PER_PAGE = 50;
+  const [isEncrypted, setIsEncrypted] = useState(false);
+  const { blockUser, unblockUser, isBlocked } = useBlockedUsers();
+
   useNotifications(userId, conversationId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (!conversationId) return;
 
-    loadMessages();
+    setMessages([]);
+    setPage(0);
+    setHasMore(true);
+    loadMessages(0);
     loadOtherUser();
     loadCurrentUser();
     loadConversation();
+    checkEncryption();
 
     // Subscribe to new messages
     const channel = supabase
@@ -104,39 +133,56 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   useEffect(() => {
-    scrollToBottom();
+    // Only auto-scroll to bottom if we are on the first page
+    if (page === 0) {
+      scrollToBottom();
+    }
     // Mark messages as read when viewing them
     messages.forEach((msg) => {
       if (msg.sender_id !== userId) {
         markAsRead(msg.id);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   useEffect(() => {
+    let filtered = messages;
+
+    // Filter blocked users
+    filtered = filtered.filter(msg => !isBlocked(msg.sender_id));
+
     if (searchQuery) {
-      const filtered = messages.filter((msg) =>
+      filtered = filtered.filter((msg) =>
         msg.content.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredMessages(filtered);
-    } else {
-      setFilteredMessages(messages);
     }
-  }, [searchQuery, messages]);
 
-  const loadMessages = async () => {
+    setFilteredMessages(filtered);
+  }, [searchQuery, messages, isBlocked]); // Added isBlocked to dependency array implies re-render on block change if hook returns new function/value
+
+  const loadMessages = async (pageIndex: number) => {
     if (!conversationId) return;
+
+    const from = pageIndex * MESSAGES_PER_PAGE;
+    const to = from + MESSAGES_PER_PAGE - 1;
 
     const { data } = await supabase
       .from("messages")
       .select("*")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (data) {
+      if (data.length < MESSAGES_PER_PAGE) {
+        setHasMore(false);
+      }
+
       // Load sender profiles for all messages
       const messagesWithProfiles = await Promise.all(
         data.map(async (msg) => {
@@ -148,11 +194,27 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
           return {
             ...msg,
-            sender: profile,
+            sender: profile || { username: "Deleted User", avatar_url: null },
           };
         })
       );
-      setMessages(messagesWithProfiles);
+
+      setMessages((prev) => {
+        const newMessages = messagesWithProfiles.reverse();
+        // Remove duplicates just in case
+        const existingIds = new Set(prev.map(m => m.id));
+        const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m.id));
+        return [...uniqueNewMessages, ...prev];
+      });
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    if (scrollTop === 0 && hasMore) {
+      const newPage = page + 1;
+      setPage(newPage);
+      loadMessages(newPage);
     }
   };
 
@@ -163,7 +225,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       .eq("id", message.sender_id)
       .single();
 
-    setMessages((prev) => [...prev, { ...message, sender: profile }]);
+    setMessages((prev) => [...prev, { ...message, sender: profile || { username: "Deleted User", avatar_url: null } }]);
   };
 
   const loadCurrentUser = async () => {
@@ -225,17 +287,26 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }, 2000);
   };
 
+  const checkEncryption = () => {
+    // Placeholder: Check if we have keys setup (stored in IndexedDB from Settings)
+    // In a real E2EE app, we would also check if the recipient has a public key.
+    // Currently, we disable the lock icon to avoid deception as we cannot exchange keys.
+    setIsEncrypted(false);
+  };
+
   const sendMessage = async (e: React.FormEvent, mediaUrl?: string, mediaType?: "image" | "file" | "voice") => {
     e.preventDefault();
     if ((!newMessage.trim() && !mediaUrl) || !conversationId) return;
+
+    const content = mediaUrl
+      ? (mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File")
+      : newMessage.trim();
 
     try {
       const { error } = await supabase.from("messages").insert({
         conversation_id: conversationId,
         sender_id: userId,
-        content: mediaUrl 
-          ? (mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File")
-          : newMessage.trim(),
+        content: content,
         type: mediaUrl ? mediaType : "text",
         media_url: mediaUrl,
         reply_to_id: replyToMessage?.id,
@@ -247,21 +318,22 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       setShowEmojiPicker(false);
       setTyping(false, currentUsername);
       setReplyToMessage(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
   const handleMediaUploaded = (url: string, type: "image" | "file") => {
-    sendMessage(new Event("submit") as any, url, type);
+    sendMessage(new Event("submit") as React.FormEvent, url, type);
   };
 
   const handleVoiceSent = (url: string) => {
-    sendMessage(new Event("submit") as any, url, "voice");
+    sendMessage(new Event("submit") as React.FormEvent, url, "voice");
   };
 
   const handleSearch = (query: string) => {
@@ -269,12 +341,36 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   };
 
   const highlightText = (text: string, highlight: string) => {
-    if (!highlight.trim()) return text;
+    if (!highlight.trim()) return renderText(text);
     const regex = new RegExp(`(${highlight})`, "gi");
     const parts = text.split(regex);
     return parts.map((part, i) => 
-      regex.test(part) ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600">{part}</mark> : part
+      regex.test(part) ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600">{part}</mark> : renderText(part)
     );
+  };
+
+  const renderText = (text: string) => {
+    // Regex to find URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline hover:opacity-80 break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   const handleEditMessage = async (messageId: string) => {
@@ -309,10 +405,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         setEditingContent("");
         loadMessages();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -331,10 +428,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         title: "Success",
         description: "Message deleted",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -379,10 +477,11 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
           description: "Message pinned",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -403,7 +502,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     }
   };
 
-  const addEmoji = (emoji: any) => {
+  const addEmoji = (emoji: { native: string }) => {
     setNewMessage((prev) => prev + emoji.native);
   };
 
@@ -445,7 +544,21 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold">{otherUser?.username || "Loading..."}</h2>
+                  {isEncrypted && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Lock className="w-3 h-3 text-green-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>End-to-end encrypted</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {Object.keys(typingUsers).length > 0
                     ? "typing..."
@@ -454,6 +567,24 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                     : "Offline"}
                 </p>
               </div>
+              {otherUser && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (isBlocked(otherUser.id)) {
+                      unblockUser(otherUser.id);
+                      toast({ title: "User Unblocked", description: "You will now see messages from this user." });
+                    } else {
+                      blockUser(otherUser.id);
+                      toast({ title: "User Blocked", description: "You will no longer see messages from this user.", variant: "destructive" });
+                    }
+                  }}
+                  title={isBlocked(otherUser.id) ? "Unblock User" : "Block User"}
+                >
+                  <Ban className={`w-5 h-5 ${isBlocked(otherUser.id) ? "text-red-500" : "text-muted-foreground"}`} />
+                </Button>
+              )}
             </>
           )}
           <Button
@@ -464,6 +595,54 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
             <Search className="w-5 h-5" />
           </Button>
           {conversationId && <ChatExport conversationId={conversationId} userId={userId} />}
+          {conversationId && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all messages in this conversation for everyone. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase
+                          .from("messages")
+                          .delete()
+                          .eq("conversation_id", conversationId);
+
+                        if (error) throw error;
+
+                        loadMessages();
+                        toast({
+                          title: "Chat cleared",
+                          description: "All messages have been deleted",
+                        });
+                      } catch (error: unknown) {
+                        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+                        toast({
+                          title: "Error",
+                          description: errorMessage,
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    Clear Chat
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           {conversationType === "group" && (
             <GroupVoiceChat conversationId={conversationId!} userId={userId} />
           )}
@@ -483,9 +662,28 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea
+        className="flex-1 p-4"
+        onScrollCapture={handleScroll}
+      >
         <TypingIndicator typingUsers={typingUsers} />
         <div className="space-y-4">
+          {hasMore && (
+            <div className="text-center py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const newPage = page + 1;
+                  setPage(newPage);
+                  loadMessages(newPage);
+                }}
+                disabled={!hasMore}
+              >
+                Load older messages
+              </Button>
+            </div>
+          )}
           {filteredMessages.map((message) => {
             const isOwn = message.sender_id === userId;
             const messageReads = readReceipts[message.id] || [];

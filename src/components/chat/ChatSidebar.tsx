@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, MessageCircle, Search, Plus, Settings } from "lucide-react";
+import { LogOut, MessageCircle, Search, Plus, Settings, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -14,6 +14,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ChatSidebarProps {
   userId: string;
@@ -36,7 +47,7 @@ interface Conversation {
 
 const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: ChatSidebarProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<{ id: string; username: string; avatar_url: string | null; status?: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
   const navigate = useNavigate();
@@ -66,6 +77,7 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   const loadConversations = async () => {
@@ -105,7 +117,7 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
 
             return {
               ...convo,
-              otherUser,
+              otherUser: otherUser || { username: "Deleted User", avatar_url: null, is_online: false },
             };
           }
         }
@@ -185,10 +197,11 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
         title: "Chat created",
         description: "Start your conversation!",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -250,29 +263,89 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
             const isOnline = conversation.otherUser?.is_online || false;
 
             return (
-              <button
+              <div
                 key={conversation.id}
-                onClick={() => onSelectConversation(conversation.id)}
-                className={`w-full p-3 rounded-lg hover:bg-secondary transition-colors flex items-center gap-3 ${
+                className={`w-full p-3 rounded-lg hover:bg-secondary transition-colors flex items-center gap-3 group relative ${
                   selectedConversationId === conversation.id ? "bg-secondary" : ""
                 }`}
               >
-                <div className="relative">
-                  <Avatar>
-                    <AvatarImage src={avatarUrl || undefined} />
-                    <AvatarFallback className="gradient-primary text-white">
-                      {displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {isOnline && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-online rounded-full border-2 border-chat-sidebar" />
-                  )}
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">{displayName}</p>
-                  <p className="text-sm text-muted-foreground">Click to chat</p>
-                </div>
-              </button>
+                <button
+                  onClick={() => onSelectConversation(conversation.id)}
+                  className="flex items-center gap-3 flex-1 text-left"
+                >
+                  <div className="relative">
+                    <Avatar>
+                      <AvatarImage src={avatarUrl || undefined} />
+                      <AvatarFallback className="gradient-primary text-white">
+                        {displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isOnline && (
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-online rounded-full border-2 border-chat-sidebar" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{displayName}</p>
+                    <p className="text-sm text-muted-foreground">Click to chat</p>
+                  </div>
+                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Leave conversation?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to leave this conversation?
+                        {conversation.type === "direct" && " This will remove it from your list."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from("conversation_participants")
+                              .delete()
+                              .eq("conversation_id", conversation.id)
+                              .eq("user_id", userId);
+
+                            if (error) throw error;
+
+                            if (selectedConversationId === conversation.id) {
+                              onSelectConversation("");
+                            }
+                            loadConversations();
+
+                            toast({
+                              title: "Left conversation",
+                              description: "You have left the conversation",
+                            });
+                          } catch (error: unknown) {
+                            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+                            toast({
+                              title: "Error",
+                              description: errorMessage,
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                      >
+                        Leave
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             );
           })}
         </div>

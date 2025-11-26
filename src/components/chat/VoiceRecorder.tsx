@@ -35,6 +35,10 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
+      if (audioContextRef.current) {
+        await audioContextRef.current.close();
+      }
+
       const audioContext = new AudioContext();
       audioContextRef.current = audioContext;
       const analyser = audioContext.createAnalyser();
@@ -111,10 +115,11 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
 
       onVoiceSent(publicUrl);
       deleteRecording();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

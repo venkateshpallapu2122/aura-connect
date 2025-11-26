@@ -228,16 +228,20 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
               size="icon"
               onClick={() => navigate("/profile-settings")}
               className="hover:bg-secondary"
+              title="Settings"
             >
               <Settings className="w-5 h-5" />
+              <span className="sr-only">Settings</span>
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleLogout}
               className="hover:bg-secondary"
+              title="Logout"
             >
               <LogOut className="w-5 h-5" />
+              <span className="sr-only">Logout</span>
             </Button>
           </div>
         </div>

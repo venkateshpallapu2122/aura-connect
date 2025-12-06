@@ -329,11 +329,39 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   };
 
   const handleMediaUploaded = (url: string, type: "image" | "file") => {
-    sendMessage(new Event("submit") as React.FormEvent, url, type);
+    sendMediaMessage(url, type);
   };
 
   const handleVoiceSent = (url: string) => {
-    sendMessage(new Event("submit") as React.FormEvent, url, "voice");
+    sendMediaMessage(url, "voice");
+  };
+
+  const sendMediaMessage = async (mediaUrl: string, mediaType: "image" | "file" | "voice") => {
+    if (!conversationId) return;
+
+    const content = mediaType === "image" ? "📷 Image" : mediaType === "voice" ? "🎤 Voice message" : "📎 File";
+
+    try {
+      const { error } = await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        content: content,
+        type: mediaType,
+        media_url: mediaUrl,
+        reply_to_id: replyToMessage?.id,
+      });
+
+      if (error) throw error;
+
+      setReplyToMessage(null);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSearch = (query: string) => {
@@ -403,7 +431,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
         setEditingMessageId(null);
         setEditingContent("");
-        loadMessages();
+        setMessages([]);
+        setPage(0);
+        setHasMore(true);
+        loadMessages(0);
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
@@ -422,7 +453,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
         .update({ deleted_at: new Date().toISOString() })
         .eq("id", messageId);
 
-      loadMessages();
+      setMessages([]);
+      setPage(0);
+      setHasMore(true);
+      loadMessages(0);
       
       toast({
         title: "Success",
@@ -622,7 +656,10 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
                         if (error) throw error;
 
-                        loadMessages();
+                        setMessages([]);
+                        setPage(0);
+                        setHasMore(true);
+                        loadMessages(0);
                         toast({
                           title: "Chat cleared",
                           description: "All messages have been deleted",

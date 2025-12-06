@@ -8,7 +8,8 @@ import { generateKeyPair, encryptMessage, decryptMessage, exportPublicKey, impor
 // Polyfill for TextEncoder/TextDecoder if missing (Node < 11)
 if (typeof TextEncoder === 'undefined') {
   import('util').then(({ TextEncoder, TextDecoder }) => {
-    global.TextEncoder = TextEncoder;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    global.TextEncoder = TextEncoder as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     global.TextDecoder = TextDecoder as any;
   });

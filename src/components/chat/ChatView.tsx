@@ -81,6 +81,8 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
+  const [searchResultIndex, setSearchResultIndex] = useState(0);
+  const [searchResults, setSearchResults] = useState<string[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [forwardingMessage, setForwardingMessage] = useState<{ id: string; content: string; mediaUrl?: string | null } | null>(null);
@@ -156,14 +158,16 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
     // Filter blocked users
     filtered = filtered.filter(msg => !isBlocked(msg.sender_id));
 
-    if (searchQuery) {
-      filtered = filtered.filter((msg) =>
-        msg.content.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
     setFilteredMessages(filtered);
-  }, [searchQuery, messages, isBlocked]); // Added isBlocked to dependency array implies re-render on block change if hook returns new function/value
+    
+    // Update search results when messages change
+    if (searchQuery.trim()) {
+      const matchingIds = filtered
+        .filter(msg => msg.content.toLowerCase().includes(searchQuery.toLowerCase()))
+        .map(msg => msg.id);
+      setSearchResults(matchingIds);
+    }
+  }, [searchQuery, messages, isBlocked]);
 
   const loadMessages = async (pageIndex: number) => {
     if (!conversationId) return;
@@ -366,6 +370,35 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
+    setSearchResultIndex(0);
+    
+    if (query.trim()) {
+      const matchingIds = filteredMessages
+        .filter(msg => msg.content.toLowerCase().includes(query.toLowerCase()))
+        .map(msg => msg.id);
+      setSearchResults(matchingIds);
+      
+      // Scroll to first result
+      if (matchingIds.length > 0) {
+        scrollToMessage(matchingIds[0]);
+      }
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  const handleNavigateSearchResult = (direction: "up" | "down") => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex: number;
+    if (direction === "down") {
+      newIndex = (searchResultIndex + 1) % searchResults.length;
+    } else {
+      newIndex = (searchResultIndex - 1 + searchResults.length) % searchResults.length;
+    }
+    
+    setSearchResultIndex(newIndex);
+    scrollToMessage(searchResults[newIndex]);
   };
 
   const highlightText = (text: string, highlight: string) => {
@@ -687,7 +720,18 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
       </div>
 
       {showSearch && (
-        <MessageSearch onSearch={handleSearch} onClose={() => { setShowSearch(false); setSearchQuery(""); }} />
+        <MessageSearch 
+          onSearch={handleSearch} 
+          onClose={() => { 
+            setShowSearch(false); 
+            setSearchQuery(""); 
+            setSearchResults([]);
+            setSearchResultIndex(0);
+          }}
+          resultCount={searchResults.length}
+          currentResultIndex={searchResultIndex}
+          onNavigateResult={handleNavigateSearchResult}
+        />
       )}
 
       {conversationId && (

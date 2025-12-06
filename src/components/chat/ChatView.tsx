@@ -30,7 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Lock, Ban } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
@@ -49,6 +49,7 @@ import ScheduledMessages from "./ScheduledMessages";
 import MessageReply, { ReplyMessageDisplay } from "./MessageReply";
 import TypingIndicator from "./TypingIndicator";
 import PinnedMessages from "./PinnedMessages";
+import UserActions from "./UserActions";
 
 interface ChatViewProps {
   userId: string;
@@ -98,7 +99,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const [page, setPage] = useState(0);
   const MESSAGES_PER_PAGE = 50;
   const [isEncrypted, setIsEncrypted] = useState(false);
-  const { blockUser, unblockUser, isBlocked } = useBlockedUsers();
+  const { blockUser, unblockUser, isBlocked } = useBlockedUsers(userId);
 
   useNotifications(userId, conversationId);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -635,22 +636,14 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
                 </p>
               </div>
               {otherUser && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    if (isBlocked(otherUser.id)) {
-                      unblockUser(otherUser.id);
-                      toast({ title: "User Unblocked", description: "You will now see messages from this user." });
-                    } else {
-                      blockUser(otherUser.id);
-                      toast({ title: "User Blocked", description: "You will no longer see messages from this user.", variant: "destructive" });
-                    }
-                  }}
-                  title={isBlocked(otherUser.id) ? "Unblock User" : "Block User"}
-                >
-                  <Ban className={`w-5 h-5 ${isBlocked(otherUser.id) ? "text-red-500" : "text-muted-foreground"}`} />
-                </Button>
+                <UserActions
+                  userId={userId}
+                  targetUserId={otherUser.id}
+                  targetUsername={otherUser.username}
+                  isBlocked={isBlocked(otherUser.id)}
+                  onBlock={() => blockUser(otherUser.id)}
+                  onUnblock={() => unblockUser(otherUser.id)}
+                />
               )}
             </>
           )}

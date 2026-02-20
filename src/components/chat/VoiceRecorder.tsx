@@ -135,6 +135,7 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
             size="icon"
             onClick={isRecording ? stopRecording : startRecording}
             className={isRecording ? "bg-destructive/10" : "hover:bg-secondary"}
+            aria-label={isRecording ? "Stop recording" : "Start recording"}
           >
             {isRecording ? <Square className="w-5 h-5 text-destructive" /> : <Mic className="w-5 h-5" />}
           </Button>
@@ -159,6 +160,7 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
             size="icon"
             onClick={deleteRecording}
             className="hover:bg-destructive/10"
+            aria-label="Delete recording"
           >
             <Trash2 className="w-5 h-5 text-destructive" />
           </Button>
@@ -167,6 +169,7 @@ const VoiceRecorder = ({ onVoiceSent, userId }: VoiceRecorderProps) => {
             size="icon"
             onClick={sendVoiceMessage}
             className="gradient-primary text-white"
+            aria-label="Send voice message"
           >
             <Send className="w-5 h-5" />
           </Button>

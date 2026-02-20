@@ -37,12 +37,17 @@ Follow these steps:
 git clone <YOUR_GIT_URL>
 
 # Step 2: Navigate to the project directory
-cd <YOUR_PROJECT_NAME>
+cd vite_react_shadcn_ts
 
 # Step 3: Install the necessary dependencies
 npm install
 
-# Step 4: Start the development server
+# Step 4: Configure Environment Variables
+# Create a .env file in the root directory and add your Supabase credentials:
+# VITE_SUPABASE_URL=your_supabase_project_url
+# VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+
+# Step 5: Start the development server
 npm run dev
 ```
 

@@ -11,6 +11,17 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Authentication: verify the request comes from an authorized source
+  const authHeader = req.headers.get("Authorization");
+  const expectedKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+  if (!authHeader || !expectedKey || authHeader !== `Bearer ${expectedKey}`) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,7 +29,6 @@ Deno.serve(async (req) => {
 
     console.log("Checking for scheduled messages to send...");
 
-    // Get all unsent scheduled messages that are due
     const { data: scheduledMessages, error: fetchError } = await supabase
       .from("scheduled_messages")
       .select("*")
@@ -39,11 +49,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send each message
     const results = await Promise.all(
       scheduledMessages.map(async (scheduled) => {
         try {
-          // Insert the message
           const { error: insertError } = await supabase.from("messages").insert({
             conversation_id: scheduled.conversation_id,
             sender_id: scheduled.sender_id,
@@ -57,7 +65,6 @@ Deno.serve(async (req) => {
             return { id: scheduled.id, success: false, error: insertError };
           }
 
-          // Mark as sent
           const { error: updateError } = await supabase
             .from("scheduled_messages")
             .update({ sent: true })

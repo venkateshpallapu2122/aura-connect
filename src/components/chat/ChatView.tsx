@@ -102,7 +102,7 @@ const ChatView = ({ userId, conversationId }: ChatViewProps) => {
   const { blockUser, unblockUser, isBlocked } = useBlockedUsers(userId);
 
   useNotifications(userId, conversationId);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (!conversationId) return;

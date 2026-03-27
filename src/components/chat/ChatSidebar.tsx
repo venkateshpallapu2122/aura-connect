@@ -146,6 +146,23 @@ const ChatSidebar = ({ userId, selectedConversationId, onSelectConversation }: C
 
   const createConversation = async (otherUserId: string) => {
     try {
+      // Verify other user exists
+      const { data: otherUser, error: userError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", otherUserId)
+        .single();
+
+      if (userError || !otherUser) {
+        toast({
+          title: "Error",
+          description: "This user no longer exists.",
+          variant: "destructive",
+        });
+        loadUsers(); // Refresh the user list
+        return;
+      }
+
       // Check if conversation already exists
       const { data: existingParticipations } = await supabase
         .from("conversation_participants")
